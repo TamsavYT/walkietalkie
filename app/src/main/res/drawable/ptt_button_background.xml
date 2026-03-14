@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pressed / transmitting state -->
+    <item android:state_selected="true">
+        <shape android:shape="oval">
+            <solid android:color="@color/ptt_pressed" />
+            <stroke
+                android:width="4dp"
+                android:color="#FFFF6E40" />
+        </shape>
+    </item>
+    <!-- Disabled state -->
+    <item android:state_enabled="false">
+        <shape android:shape="oval">
+            <solid android:color="@color/ptt_disabled" />
+            <stroke
+                android:width="3dp"
+                android:color="#FF616161" />
+        </shape>
+    </item>
+    <!-- Normal idle state -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/ptt_idle" />
+            <stroke
+                android:width="3dp"
+                android:color="@color/primary_light" />
+        </shape>
+    </item>
+</selector>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary palette -->
+    <color name="primary">#FF1B5E20</color>
+    <color name="primary_dark">#FF0D3B13</color>
+    <color name="primary_light">#FF4CAF50</color>
+    <color name="accent">#FF76FF03</color>
+
+    <!-- Background & Surface -->
+    <color name="background">#FF121212</color>
+    <color name="surface">#FF1E1E1E</color>
+    <color name="surface_elevated">#FF2C2C2C</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#B3FFFFFF</color>
+    <color name="text_hint">#66FFFFFF</color>
+
+    <!-- Status -->
+    <color name="status_connected">#FF4CAF50</color>
+    <color name="status_disconnected">#FF757575</color>
+    <color name="status_transmitting">#FFFF5722</color>
+
+    <!-- PTT Button -->
+    <color name="ptt_idle">#FF2E7D32</color>
+    <color name="ptt_pressed">#FFFF3D00</color>
+    <color name="ptt_disabled">#FF424242</color>
+
+    <!-- Widget -->
+    <color name="widget_bg">#E6121212</color>
+    <color name="widget_btn_idle">#FF2E7D32</color>
+    <color name="widget_btn_active">#FFFF3D00</color>
+
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>

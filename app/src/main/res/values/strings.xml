@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LAN Walkie Talkie</string>
+    <string name="push_to_talk">PUSH TO TALK</string>
+    <string name="transmitting">TRANSMITTING…</string>
+    <string name="searching_devices">Searching for devices…</string>
+    <string name="devices_found">%d device(s) found</string>
+    <string name="connected_to">Connected to %s</string>
+    <string name="not_connected">Not connected</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="widget_name">Walkie Talkie</string>
+    <string name="widget_description">Quick talk button for LAN Walkie Talkie</string>
+    <string name="notification_channel_name">Walkie Talkie Service</string>
+    <string name="notification_channel_desc">Shows when walkie talkie is active</string>
+</resources>
