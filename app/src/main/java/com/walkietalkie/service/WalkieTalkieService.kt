@@ -31,12 +31,6 @@ import com.walkietalkie.networking.UdpAudioSender
  * The service exposes a [LocalBinder] so the Activity and Widget
  * can control PTT state, connect/disconnect devices, and observe
  * discovered-device changes.
- *
- * Intents / actions:
- *   [ACTION_START_SERVICE]    – start foreground + begin discovery
- *   [ACTION_STOP_SERVICE]     – stop the service entirely
- *   [ACTION_START_TRANSMIT]   – begin sending audio
- *   [ACTION_STOP_TRANSMIT]    – stop sending audio
  */
 class WalkieTalkieService : Service() {
 
@@ -134,9 +128,11 @@ class WalkieTalkieService : Service() {
         audioRecorder.initialize()
         audioPlayer.initialize()
 
-        // Start the receiver immediately — we always want to be able
-        // to hear incoming audio, even before we connect to someone.
+        // Start the receiver and sender immediately.
+        // By default, we are in "Channel Mode" (broacast to everyone).
         udpReceiver.start()
+        udpSender.start()
+        udpSender.setBroadcastMode(SERVICE_PORT)
     }
 
     /** NSD discovery callback wired into [discoveryManager]. */
@@ -144,7 +140,8 @@ class WalkieTalkieService : Service() {
         override fun onDeviceFound(device: DeviceInfo) {
             synchronized(discoveredDevices) {
                 discoveredDevices.removeAll { it.id == device.id }
-                discoveredDevices.add(device)
+                val isCurrentlyConnected = connectedDevice?.id == device.id
+                discoveredDevices.add(device.copy(isConnected = isCurrentlyConnected))
             }
             onDeviceListChanged?.invoke()
             Log.d(TAG, "Device found: ${device.name} (${device.hostAddress})")
@@ -156,7 +153,8 @@ class WalkieTalkieService : Service() {
             }
             if (connectedDevice?.hostAddress == device.hostAddress) {
                 connectedDevice = null
-                stopTransmitting()
+                // Return to broadcast mode if our specific peer is lost
+                udpSender.setBroadcastMode(SERVICE_PORT)
             }
             onDeviceListChanged?.invoke()
             Log.d(TAG, "Device lost: ${device.name}")
@@ -225,46 +223,59 @@ class WalkieTalkieService : Service() {
     //  Public API (called from Activity / Widget)
     // ═════════════════════════════════════════════════════════════════════
 
-    /** Connect to a discovered device for two-way audio. */
+    /** Connect to a discovered device for private two-way audio. */
     fun connectToDevice(device: DeviceInfo) {
-        connectedDevice = device
+        val connected = device.copy(isConnected = true)
+        connectedDevice = connected
         synchronized(discoveredDevices) {
-            discoveredDevices.forEach { it.isConnected = it.id == device.id }
+            val updated = discoveredDevices.map { 
+                it.copy(isConnected = it.id == device.id)
+            }
+            discoveredDevices.clear()
+            discoveredDevices.addAll(updated)
         }
-        udpSender.start(device.hostAddress, device.port)
-        updateNotification("Connected to ${device.name}")
+        
+        // Switch from Broadcast to specific Unicast target
+        udpSender.clearTargets()
+        udpSender.addTarget(connected.hostAddress, connected.port)
+        
+        updateNotification("Private: ${connected.name}")
         onDeviceListChanged?.invoke()
-        Log.d(TAG, "Connected to ${device.name}")
+        Log.d(TAG, "Focused on ${connected.name}")
     }
 
-    /** Disconnect from the current peer. */
+    /** disconnect from a private peer and return to channel broadcast. */
     fun disconnectFromDevice() {
         synchronized(discoveredDevices) {
-            discoveredDevices.forEach { it.isConnected = false }
+            val updated = discoveredDevices.map { it.copy(isConnected = false) }
+            discoveredDevices.clear()
+            discoveredDevices.addAll(updated)
         }
-        udpSender.stop()
+        
+        // Return to broadcast mode
+        udpSender.setBroadcastMode(SERVICE_PORT)
+        
         connectedDevice = null
         stopTransmitting()
-        updateNotification("Walkie Talkie is ready")
+        updateNotification("Walkie Talkie: Channel")
         onDeviceListChanged?.invoke()
-        Log.d(TAG, "Disconnected")
+        Log.d(TAG, "Returned to Channel Broadcast")
     }
 
     /** Begin transmitting audio (PTT press). */
     fun startTransmitting() {
         if (isTransmitting) return
-        val target = connectedDevice
-        if (target == null) {
-            onError?.invoke("No device connected")
-            return
-        }
 
-        // Ensure sender socket is open
+        // Ensure sender socket is open (should be already)
         if (!udpSender.isActive()) {
-            udpSender.start(target.hostAddress, target.port)
+            udpSender.start()
+            if (connectedDevice == null) {
+                udpSender.setBroadcastMode(SERVICE_PORT)
+            }
         }
 
         isTransmitting = true
+        audioPlayer.isMuted = true
         audioRecorder.startRecording(object : AudioRecorderManager.AudioDataCallback {
             override fun onAudioData(data: ByteArray, length: Int) {
                 udpSender.sendAudioData(data, length)
@@ -279,9 +290,10 @@ class WalkieTalkieService : Service() {
     fun stopTransmitting() {
         if (!isTransmitting) return
         isTransmitting = false
+        audioPlayer.isMuted = false
         audioRecorder.stopRecording()
         updateNotification(
-            connectedDevice?.let { "Connected to ${it.name}" } ?: "Walkie Talkie is ready"
+            connectedDevice?.let { "Private: ${it.name}" } ?: "Walkie Talkie: Channel"
         )
         onTransmissionStateChanged?.invoke(false)
         Log.d(TAG, "TX stopped")

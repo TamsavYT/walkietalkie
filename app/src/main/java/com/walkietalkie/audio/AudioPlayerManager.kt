@@ -25,16 +25,23 @@ class AudioPlayerManager {
     private var audioTrack: AudioTrack? = null
     private var isPlaying = false
 
+    /**
+     * When true, [write] calls are ignored. Used to prevent local
+     * feedback/echo while the user is transmitting.
+     */
+    var isMuted = false
+
     // ── Initialization ───────────────────────────────────────────────────
 
     /** Create and initialise the [AudioTrack]. */
     fun initialize(): Boolean {
         val minBuffer = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-        val bufferSize = maxOf(minBuffer, AudioRecorderManager.BUFFER_SIZE_BYTES * 2)
+        // Ensure buffer is large enough for ~160ms of audio to prevent underruns
+        val bufferSize = maxOf(minBuffer, AudioRecorderManager.BUFFER_SIZE_BYTES * 8)
 
         return try {
             val attrs = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build()
 
@@ -84,7 +91,7 @@ class AudioPlayerManager {
 
     /** Write PCM data for immediate playback. */
     fun write(data: ByteArray, length: Int) {
-        if (!isPlaying) return
+        if (!isPlaying || isMuted) return
         try {
             audioTrack?.write(data, 0, length)
         } catch (e: Exception) {

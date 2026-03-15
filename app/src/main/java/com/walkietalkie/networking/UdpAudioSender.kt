@@ -7,38 +7,33 @@ import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Sends PCM audio data as UDP packets to a target device.
- *
- * Each packet carries one audio buffer (~640 bytes = 20 ms of 16 kHz mono PCM16).
- * Designed for low-latency LAN streaming — no retransmission, no sequencing.
+ * Sends PCM audio data as UDP packets to one or more target devices.
+ * Supports broadcasting to the entire LAN segment.
  */
 class UdpAudioSender {
 
     companion object {
         private const val TAG = "UdpAudioSender"
+        private const val BROADCAST_ADDR = "255.255.255.255"
     }
 
     private var socket: DatagramSocket? = null
-    private var targetAddress: InetAddress? = null
-    private var targetPort: Int = 0
+    private val targetAddresses = mutableSetOf<Pair<InetAddress, Int>>()
     private val isActive = AtomicBoolean(false)
 
     /**
-     * Open a UDP socket and set the target destination.
-     *
-     * @param hostAddress IP address of the receiving device
-     * @param port        UDP port the receiver is listening on
+     * Start the sender. Opens a UDP socket with broadcast enabled.
      */
-    fun start(hostAddress: String, port: Int) {
+    fun start() {
+        if (isActive.get()) return
         try {
-            targetAddress = InetAddress.getByName(hostAddress)
-            targetPort = port
             socket = DatagramSocket().apply {
+                broadcast = true
                 // Small send buffer for minimal kernel-side latency
                 sendBufferSize = 1280
             }
             isActive.set(true)
-            Log.d(TAG, "Sender started → $hostAddress:$port")
+            Log.d(TAG, "Sender started (broadcast enabled)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start sender", e)
             isActive.set(false)
@@ -46,20 +41,60 @@ class UdpAudioSender {
     }
 
     /**
-     * Send a PCM audio buffer as a UDP datagram.
-     * Called from the audio-recording thread; must be non-blocking.
-     *
-     * @param data   PCM byte array
-     * @param length number of valid bytes in the array
+     * Add a target destination for audio packets.
+     * @param hostAddress IP address
+     * @param port        UDP port
      */
+    fun addTarget(hostAddress: String, port: Int) {
+        try {
+            val addr = InetAddress.getByName(hostAddress)
+            synchronized(targetAddresses) {
+                targetAddresses.add(addr to port)
+            }
+            Log.d(TAG, "Target added: $hostAddress:$port")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to add target: $hostAddress", e)
+        }
+    }
+
+    /**
+     * Remove a target destination.
+     */
+    fun removeTarget(hostAddress: String) {
+        synchronized(targetAddresses) {
+            targetAddresses.removeAll { it.first.hostAddress == hostAddress }
+        }
+        Log.d(TAG, "Target removed: $hostAddress")
+    }
+
+    /**
+     * Clear all specific targets and set the broadcast address as the only target.
+     */
+    fun setBroadcastMode(port: Int) {
+        clearTargets()
+        addTarget(BROADCAST_ADDR, port)
+    }
+
+    /** Remove all targets. */
+    fun clearTargets() {
+        synchronized(targetAddresses) {
+            targetAddresses.clear()
+        }
+    }
+
+    /** Send audio data to all added targets. */
     fun sendAudioData(data: ByteArray, length: Int) {
         if (!isActive.get()) return
-        try {
-            val addr = targetAddress ?: return
-            val packet = DatagramPacket(data, length, addr, targetPort)
-            socket?.send(packet)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending audio", e)
+        val sock = socket ?: return
+
+        val targets = synchronized(targetAddresses) { targetAddresses.toList() }
+        for ((addr, port) in targets) {
+            try {
+                val packet = DatagramPacket(data, length, addr, port)
+                sock.send(packet)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending to $addr:$port", e)
+            }
         }
     }
 
@@ -72,9 +107,10 @@ class UdpAudioSender {
             Log.e(TAG, "Error closing socket", e)
         }
         socket = null
-        targetAddress = null
+        clearTargets()
         Log.d(TAG, "Sender stopped")
     }
 
     fun isActive(): Boolean = isActive.get()
 }
+

@@ -105,14 +105,10 @@ class MainActivity : AppCompatActivity() {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     service?.startTransmitting()
-                    binding.btnPushToTalk.text = getString(R.string.transmitting)
-                    binding.btnPushToTalk.isSelected = true
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     service?.stopTransmitting()
-                    binding.btnPushToTalk.text = getString(R.string.push_to_talk)
-                    binding.btnPushToTalk.isSelected = false
                     true
                 }
                 else -> false
@@ -126,7 +122,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupServiceCallbacks() {
         service?.onDeviceListChanged = {
-            runOnUiThread { updateDeviceList() }
+            runOnUiThread { updateUI() }
         }
         service?.onTransmissionStateChanged = { tx ->
             runOnUiThread {
@@ -153,7 +149,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateDeviceList() {
         val devices = service?.getDevices() ?: emptyList()
-        deviceAdapter.submitList(devices.toList())
+        deviceAdapter.submitList(devices)
         binding.txtStatus.text = if (devices.isEmpty()) {
             getString(R.string.searching_devices)
         } else {
@@ -168,8 +164,9 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.not_connected)
         }
-        binding.btnPushToTalk.isEnabled = conn != null
-        binding.btnPushToTalk.alpha = if (conn != null) 1.0f else 0.5f
+        // Always enabled now!
+        binding.btnPushToTalk.isEnabled = true
+        binding.btnPushToTalk.alpha = 1.0f
     }
 
     // ═════════════════════════════════════════════════════════════════════

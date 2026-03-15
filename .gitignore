@@ -1,0 +1,39 @@
+# Gradle files
+.gradle/
+build/
+
+# Android Studio / IntelliJ files
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/modules/
+
+# Local configuration
+local.properties
+
+# Log files
+*.log
+
+# Android-specific
+.cxx/
+captures/
+output.json
+
+# Built artifacts
+*.apk
+*.aar
+*.bundle
+
+# Kotlin
+.kotlin/
+
+# System files
+.DS_Store
+Thumbs.db

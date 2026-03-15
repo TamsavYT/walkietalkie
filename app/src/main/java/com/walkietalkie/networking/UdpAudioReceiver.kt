@@ -26,8 +26,8 @@ class UdpAudioReceiver(
         private const val TAG = "UdpAudioReceiver"
         /** Max bytes per UDP packet (~20 ms of 16 kHz mono PCM16 = 640 B, doubled for safety). */
         private const val PACKET_BUFFER_SIZE = 1280
-        /** Number of packets to buffer before playback begins. */
-        private const val JITTER_BUFFER_SIZE = 3
+        /** Number of packets to buffer before playback begins. Smooths out WiFi jitter. */
+        private const val JITTER_BUFFER_SIZE = 8
     }
 
     // ── State ────────────────────────────────────────────────────────────
@@ -52,7 +52,8 @@ class UdpAudioReceiver(
         try {
             socket = DatagramSocket(port).apply {
                 reuseAddress = true
-                receiveBufferSize = PACKET_BUFFER_SIZE * 4
+                // Large receive buffer to prevent OS-level drops during spikes
+                receiveBufferSize = 64 * 1024 
                 soTimeout = 1000  // 1 s timeout so we can check isRunning periodically
             }
             isRunning.set(true)
@@ -100,6 +101,7 @@ class UdpAudioReceiver(
 
         while (isRunning.get()) {
             try {
+                packet.length = buf.size // Ensure length is reset for each receive
                 socket?.receive(packet)
                 val len = packet.length
                 if (len <= 0) continue
@@ -134,9 +136,13 @@ class UdpAudioReceiver(
             var length = 0
 
             synchronized(bufferLock) {
-                while (bufferedCount == 0 && isRunning.get()) {
-                    try { bufferLock.wait(100) } catch (_: InterruptedException) { return }
+                // PRIMING: If we run dry, wait for multiple packets to accumulate
+                // to smooth out network jitter before resuming playback.
+                val primingThreshold = JITTER_BUFFER_SIZE / 2
+                while (bufferedCount < primingThreshold && isRunning.get()) {
+                    try { bufferLock.wait(200) } catch (_: InterruptedException) { return }
                 }
+                
                 if (bufferedCount > 0) {
                     data = jitterBuffer[readIndex]
                     length = jitterLengths[readIndex]

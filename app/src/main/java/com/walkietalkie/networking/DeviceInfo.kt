@@ -12,7 +12,7 @@ data class DeviceInfo(
     val name: String,
     val hostAddress: String,
     val port: Int,
-    var isConnected: Boolean = false
+    val isConnected: Boolean = false
 ) {
     /** Unique identifier based on network address. */
     val id: String get() = "$hostAddress:$port"
